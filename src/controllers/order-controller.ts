@@ -2,16 +2,16 @@ import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 import { order_schema } from "../validation/validation-order";
 import { signToken, verifyToken } from "../utility/jwt";
+import { log } from "console";
 
 export async function addOrder(req: Request, res: Response) {
-    let account;
     try {
         const token = req.cookies?.token;
         if (!token) {
             res.status(401).json({ message: "Unauthorized" });
             return;
         }
-        account = verifyToken(token);
+        const account = verifyToken(token);
 
         const { error } = order_schema.validate(req.body);
 
@@ -45,7 +45,27 @@ export async function addOrder(req: Request, res: Response) {
             },
         });
 
-        res.status(201).json({ message: "add Order successfully", order, });
+        const points = total / 10000;
+        await prisma.$transaction([
+            prisma.account.update({
+                where: { id: account.id },
+                data: {
+                    point: {
+                        increment: points as number
+                    }
+                }
+            }),
+            prisma.products.update({
+                where: { id: productid },
+                data: {
+                    stock: {
+                        decrement: quantity as number
+                    }
+                }
+            })
+        ]);
+
+        res.status(201).json({ message: "add Order successfully", order });
     } catch (error) {
         res.json({ message: error });
     }
@@ -102,7 +122,25 @@ export async function updateOrder(req: Request, res: Response) {
                 total
             },
         });
-
+        const points = total / 10000;
+        await prisma.$transaction([
+            prisma.account.update({
+                where: { id: account.id },
+                data: {
+                    point: {
+                        increment: points
+                    }
+                }
+            }),
+            prisma.products.update({
+                where: { id: productid },
+                data: {
+                    stock: {
+                        decrement: quantity
+                    }
+                }
+            })
+        ]);
         res.status(201).json({ message: "Order update successfully", order, });
     } catch (error) {
         res.json({ message: error });
@@ -209,5 +247,53 @@ export async function getUserOrder(req: Request, res: Response) {
         res.status(200).json({ data: orders, total });
     } catch (error) {
         res.json({ message: error });
+    }
+}
+
+export const transferPoint = async (req: Request, res: Response, next: any) => {
+    const { amount, receiverId } = req.body
+    try {
+        const token = req.cookies?.token;
+        if (!token) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+        const account = verifyToken(token);
+        if (amount <= 0) {
+            res.status(400).json({ message: "Jumlah Point harus lebih dari 0" })
+        }
+
+        const [sender, receiver] = await Promise.all([
+            prisma.account.findUnique({ where: { id: account.id } }),
+            prisma.account.findUnique({ where: { id: receiverId } })
+        ])
+
+        if (!sender) {
+            res.status(404).json({ message: "Pengirim Tidak Ditemukan," })
+            return
+        }
+        if (!receiver) {
+            res.status(404).json({ message: "Penerima Tidak Ditemukan" })
+            return
+        }
+
+        if (sender.point < amount) {
+            res.status(400).json({ message: "Jumlah point tidak cukup" })
+        }
+
+        //middleware prisma untuk transaction
+        await prisma.$transaction(async (transfer) => {
+            await transfer.account.update({
+                where: { id: account.id },
+                data: { point: { decrement: amount } }
+            })
+            await transfer.account.update({
+                where: { id: receiverId },
+                data: { point: { increment: amount } }
+            })
+            res.json("Transfer Point Berhasil")
+        })
+    } catch (error) {
+        res.status(500).json("interal server error")
     }
 }
