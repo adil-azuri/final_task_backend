@@ -20,7 +20,7 @@ model Account {
   password String
   role     String
   point    Int     @default(0)
-  profile  String
+  profile  String  @default("null")
   orders   Order[]
 }
 
@@ -28,7 +28,7 @@ model Products {
   id       Int      @id @default(autoincrement())
   name     String
   price    Int
-  photo    String   @default("null")
+  photo    String
   stock    Int
   createAt DateTime @default(now())
   orderby  Order[]

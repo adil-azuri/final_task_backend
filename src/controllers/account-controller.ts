@@ -14,15 +14,9 @@ export async function register(req: Request, res: Response) {
             return;
         }
 
-        if (!req.file) {
-            res.status(400).json({ message: "no file Upload" });
-            return;
-        }
-
         const { name, password, role } = req.body;
-        const profile = req.file.filename
 
-        const account = await serv_register(name, password, role, profile);
+        const account = await serv_register(name, password, role);
         res.status(201).json({ message: "Account registered", account });
     } catch (err: any) {
         res.status(400).json({ message: err.message });
@@ -66,7 +60,7 @@ export async function updateProfile(req: Request, res: Response) {
         let account = verifyToken(token);
 
         if (!account) {
-            res.status(403).json({ message: "Only admin can see all order" });
+            res.status(403).json({ message: "You Need login to change profile" });
             return
         }
 
@@ -90,4 +84,3 @@ export async function updateProfile(req: Request, res: Response) {
         res.status(500).json({ message: err.message || "Internal server error" });
     }
 }
-

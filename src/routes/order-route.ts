@@ -4,7 +4,7 @@ import { authenticate } from '../middlewares/authenticate';
 
 const router = express.Router();
 
-router.post('/add', authenticate, addOrder)
+router.post('/create', authenticate, addOrder)
 router.put('/update/:id', authenticate, updateOrder)
 router.delete('/delete/:id', authenticate, deleteOrder)
 router.get('/get', authenticate, getAllOrder)

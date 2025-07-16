@@ -2,12 +2,17 @@ import multer from "multer";
 import path from "path";
 
 const storage = multer.diskStorage({
-    destination: "src/uploads",
+    destination: (req, file, cb) => {
+        cb(null, "src/uploads");
+    },
     filename: (req, file, cb) => {
-        cb(null, `${Date.now()}-${file.originalname}`)
+        const ext = path.extname(file.originalname);
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const newFileName = `product-${uniqueSuffix}${ext}`;
+        cb(null, newFileName);
     }
-})
+});
 
 export const uploads = multer({
     storage,
-})
+});

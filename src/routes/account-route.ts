@@ -6,9 +6,8 @@ import { authenticate } from '../middlewares/authenticate';
 
 const router = express.Router();
 
-router.post("/register", uploads.single('profile'), register);
+router.post("/register", register);
 router.post("/login", login);
-
 router.put("/update-profile", authenticate, uploads.single('profile'), updateProfile);
 
 

@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import { prisma } from "../prisma/client";
 import { signToken } from "../utility/jwt";
 
-export async function serv_register(name: string, password: string, role: string, profile: string) {
+export async function serv_register(name: string, password: string, role: string) {
     if (password.length < 6) {
         throw new Error("Invalid password");
     }
@@ -11,15 +11,11 @@ export async function serv_register(name: string, password: string, role: string
         throw new Error("Invalid role, role must be admin or user");
     }
 
-    if (!profile) {
-        throw new Error("Profile cannot be empty");
-    }
-
     const hashed = await bcrypt.hash(password, 10);
 
     try {
         const account = await prisma.account.create({
-            data: { name, password: hashed, role, profile },
+            data: { name, password: hashed, role },
         });
 
         return { id: account.id, name: account.name, role: account.role };

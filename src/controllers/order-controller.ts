@@ -1,8 +1,70 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 import { order_schema } from "../validation/validation-order";
-import { signToken, verifyToken } from "../utility/jwt";
-import { log } from "console";
+import { verifyToken } from "../utility/jwt";
+
+export async function getAllOrder(req: Request, res: Response) {
+    let account;
+    const { order, limit, offset } = req.query
+    const filters: any = {}
+    try {
+        const token = req.cookies?.token;
+        if (!token) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+        account = verifyToken(token);
+
+        if (!account || account.role !== "admin") {
+            res.status(403).json({ message: "Only admin can see all order" });
+            return
+        }
+
+        const orders = await prisma.order.findMany({
+            orderBy: { userid: "asc" },
+
+        });
+
+        const total = await prisma.order.count()
+        res.status(200).json({ data: orders, total })
+    } catch (error) {
+        res.json({ message: error });
+    }
+}
+
+export async function getUserOrder(req: Request, res: Response) {
+    const { order, limit, offset } = req.query;
+    try {
+        const token = req.cookies?.token;
+        if (!token) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+        const account = verifyToken(token);
+        if (!account) {
+            res.status(403).json({ message: "User not authenticated" });
+            return;
+        }
+        const userId = account.id;
+        const orders = await prisma.order.findMany({
+            where: { userid: userId },
+            include: {
+                product_order: {
+                    select: {
+                        name: true,
+                        photo: true
+
+                    }
+                }
+            }
+
+        });
+        const total = await prisma.order.count({ where: { userid: userId } });
+        res.status(200).json({ data: orders, total });
+    } catch (error) {
+        res.json({ message: error });
+    }
+}
 
 export async function addOrder(req: Request, res: Response) {
     try {
@@ -11,34 +73,32 @@ export async function addOrder(req: Request, res: Response) {
             res.status(401).json({ message: "Unauthorized" });
             return;
         }
+
         const account = verifyToken(token);
+        if (!account) {
+            res.status(403).json({ message: "Please login first" });
+            return;
+        }
 
         const { error } = order_schema.validate(req.body);
-
         if (error) {
             res.status(400).json({ message: error.message });
             return;
         }
-        if (!account || account.role !== "user") {
-            res.status(403).json({ message: "Only user can add order, please login first" });
-            return
-        }
 
         const { productid, quantity } = req.body;
 
-        const product = await prisma.products.findUnique({ where: { id: productid } })
+        const product = await prisma.products.findUnique({ where: { id: productid } });
         if (!product) {
-            res.status(403).json({ message: "Product not Found" });
-            return
+            res.status(404).json({ message: "Product not Found" });
+            return;
         }
 
-        const total = quantity * product.price
-
-        const userid = account.id
+        const total = quantity * product.price;
 
         const order = await prisma.order.create({
             data: {
-                userid,
+                userid: account.id,
                 Productid: productid,
                 quantity,
                 total: total
@@ -46,6 +106,7 @@ export async function addOrder(req: Request, res: Response) {
         });
 
         const points = total / 10000;
+
         await prisma.$transaction([
             prisma.account.update({
                 where: { id: account.id },
@@ -65,11 +126,13 @@ export async function addOrder(req: Request, res: Response) {
             })
         ]);
 
-        res.status(201).json({ message: "add Order successfully", order });
+        res.status(201).json({ message: "Order added successfully", order });
     } catch (error) {
-        res.json({ message: error });
+
+        res.status(500).json({ message: error });
     }
 }
+
 
 export async function updateOrder(req: Request, res: Response) {
     let account;
@@ -183,72 +246,7 @@ export async function deleteOrder(req: Request, res: Response) {
     }
 }
 
-export async function getAllOrder(req: Request, res: Response) {
-    let account;
-    const { order, limit, offset } = req.query
-    const filters: any = {}
-    try {
-        const token = req.cookies?.token;
-        if (!token) {
-            res.status(401).json({ message: "Unauthorized" });
-            return;
-        }
-        account = verifyToken(token);
 
-        if (!account || account.role !== "admin") {
-            res.status(403).json({ message: "Only admin can see all order" });
-            return
-        }
-
-        const orders = await prisma.order.groupBy({
-            by: ['userid'],
-            _sum: {
-                Productid: true,
-                quantity: true,
-                total: true
-            },
-            orderBy: {
-                userid: order === "asc" ? 'asc' : 'desc' // Assuming you want to order by userid
-            },
-            take: limit ? Number(limit) : undefined,
-            skip: offset ? Number(offset) : undefined
-        });
-
-        const total = await prisma.order.count()
-        res.status(200).json({ data: orders, total })
-    } catch (error) {
-        res.json({ message: error });
-    }
-}
-
-export async function getUserOrder(req: Request, res: Response) {
-    const { order, limit, offset } = req.query;
-    try {
-        const token = req.cookies?.token;
-        if (!token) {
-            res.status(401).json({ message: "Unauthorized" });
-            return;
-        }
-        const account = verifyToken(token);
-        if (!account) {
-            res.status(403).json({ message: "User not authenticated" });
-            return;
-        }
-        const userId = account.id;
-        const orders = await prisma.order.findMany({
-            where: { userid: userId },
-            orderBy: {
-                id: order === "asc" ? 'asc' : 'desc'
-            },
-            take: limit ? Number(limit) : undefined,
-            skip: offset ? Number(offset) : undefined
-        });
-        const total = await prisma.order.count({ where: { userid: userId } });
-        res.status(200).json({ data: orders, total });
-    } catch (error) {
-        res.json({ message: error });
-    }
-}
 
 export const transferPoint = async (req: Request, res: Response, next: any) => {
     const { amount, receiverId } = req.body

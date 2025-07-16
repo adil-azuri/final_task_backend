@@ -10,9 +10,9 @@ async function main() {
 
     const products = await prisma.products.createMany({
         data: [
-            { name: "Keyboard", price: 350_000, stock: 20 },
-            { name: "Mouse", price: 150_000, stock: 20 },
-            { name: "Monitor", price: 1_500_000, stock: 20 },
+            { name: "Keyboard", price: 350_000, stock: 20, photo: "null" },
+            { name: "Mouse", price: 150_000, stock: 20, photo: "null" },
+            { name: "Monitor", price: 1_500_000, stock: 20, photo: "null" },
         ]
     })
 }
